@@ -20,31 +20,43 @@ import inet.node.ethernet.Eth1G;
 import inet.node.ethernet.EtherSwitch;
 import inet.node.inet.StandardHost;
 
-network MultiClient
+network MultiServer
 {
-    @display("bgb=489,340");
+    @display("bgb=513,433");
     submodules:
         host0: StandardHost {
-            @display("p=81,133");
+            @display("p=142,116");
         }
-        smolTcpNode: SmolTcpNode {
-            @display("p=406,172");
+        smolTcpNode0: SmolTcpNode {
+            @display("p=349,116");
         }
         configurator: IPv4NetworkConfigurator {
             @display("p=64,37");
         }
         etherSwitch: EtherSwitch {
-            @display("p=236,178");
+            @display("p=241,217");
         }
         host1: StandardHost {
-            @display("p=81,211");
+            @display("p=103,176");
         }
         host2: StandardHost {
-            @display("p=91,292");
+            @display("p=91,248");
+        }
+        smolTcpNode1: SmolTcpNode {
+            @display("p=358,287");
+        }
+        host3: StandardHost {
+            @display("p=103,318");
+        }
+        host4: StandardHost {
+            @display("p=165,381");
         }
     connections:
         host0.ethg++ <--> Eth1G <--> etherSwitch.ethg++;
         host1.ethg++ <--> Eth1G <--> etherSwitch.ethg++;
         host2.ethg++ <--> Eth1G <--> etherSwitch.ethg++;
-        smolTcpNode.ethg++ <--> Eth1G <--> etherSwitch.ethg++;
+        host3.ethg++ <--> Eth1G <--> etherSwitch.ethg++;
+        host4.ethg++ <--> Eth1G <--> etherSwitch.ethg++;
+        smolTcpNode0.ethg++ <--> Eth1G <--> etherSwitch.ethg++;
+        smolTcpNode1.ethg++ <--> Eth1G <--> etherSwitch.ethg++;
 }

@@ -31,7 +31,7 @@ module SmolTcpNode
     @labels(node,ethernet-node);
     @display("bgb=286.96,325.72");
     gates:
-        inout ethg[];
+        inout ethg[] @labels(EtherFrame-conn);
     submodules:
         stack: SmolTcpStack {
             @display("p=237.32,98.6");

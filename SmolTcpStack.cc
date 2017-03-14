@@ -6,6 +6,8 @@
 
 
 extern "C" {
+    void init_smoltcp_logging();
+
     Stack *make_smoltcp_stack(unsigned long moduleID, const char *macAddress, const char *ipAddress);
     void poll_smoltcp_stack(Stack *stack, unsigned long timestamp_ms);
 
@@ -63,12 +65,17 @@ unsigned int SmolTcpStack::recvEthernetFrame(unsigned char *buffer) {
 
 void SmolTcpStack::initialize(int stage)
 {
+    static bool first = true;
+    if (first)
+        init_smoltcp_logging();
+    first = false;
+
     if (stage == inet::INITSTAGE_LAST) {
         auto ift = check_and_cast<inet::IInterfaceTable *>(getModuleByPath("^.interfaceTable"));
         auto intf = ift->getInterfaceByName("eth");
         stack = make_smoltcp_stack(getId(), intf->getMacAddress().str().c_str(), intf->getIPv4Address().str().c_str());
+        EV_TRACE << "stack made for module " << getId() << endl;
     }
-    EV_TRACE << "stack made for module " << getId() << endl;
 }
 
 void SmolTcpStack::handleMessage(cMessage *msg)
