@@ -42,7 +42,6 @@ module SmolTcpNode
         configurator: IPv4NodeConfigurator {
             @display("p=56.440002,112.880005");
             interfaceTableModule = "^.interfaceTable";
-            routingTableModule = "^.routingTable";
         }
         routingTable: IPv4RoutingTable {
             @display("p=40.12,178.16");
