@@ -20,6 +20,14 @@ extern "C" {
         auto smolStack = check_and_cast<SmolTcpStack *>(getSimulation()->getModule(moduleId));
         return smolStack->recvEthernetFrame(buffer);
     }
+
+    // "level" corresponds to Rust's Log::LogLevel enum
+    void smoltcp_log_line(uint8_t level, const char *text) {
+        // maps the Rust loglevel to opp loglevel
+        static const LogLevel levelMapping[] = { LOGLEVEL_OFF, LOGLEVEL_ERROR,
+                LOGLEVEL_WARN, LOGLEVEL_INFO, LOGLEVEL_DEBUG, LOGLEVEL_TRACE };
+        EV_LOG(levelMapping[level], "smoltcp_c") << text << std::endl;
+    }
 }
 
 Define_Module(SmolTcpStack);
