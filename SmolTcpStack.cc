@@ -28,6 +28,11 @@ extern "C" {
                 LOGLEVEL_WARN, LOGLEVEL_INFO, LOGLEVEL_DEBUG, LOGLEVEL_TRACE };
         EV_LOG(levelMapping[level], "smoltcp_c") << text << std::endl;
     }
+
+    Socket *make_smoltcp_tcp_socket();
+    uint64_t add_smoltcp_tcp_socket(Stack *stack, Socket *socket);
+
+    uint64_t make_add_smoltcp_tcp_socket(Stack *stack);
 }
 
 Define_Module(SmolTcpStack);
@@ -62,7 +67,7 @@ unsigned int SmolTcpStack::recvEthernetFrame(unsigned char *buffer) {
 
     auto &b = rxBuffer.front();
 
-    for (int i = 0; i < b.size(); ++i)
+    for (size_t i = 0; i < b.size(); ++i)
         buffer[i] = b[i];
 
     EV_TRACE << "and we got a " << b.size() << " byte long frame for it" << endl;
@@ -82,7 +87,16 @@ void SmolTcpStack::initialize(int stage)
         auto ift = check_and_cast<inet::IInterfaceTable *>(getModuleByPath("^.interfaceTable"));
         auto intf = ift->getInterfaceByName("eth");
         stack = make_smoltcp_stack(getId(), intf->getMacAddress().str().c_str(), intf->getIPv4Address().str().c_str());
-        EV_TRACE << "stack made for module " << getId() << endl;
+        EV_TRACE << "stack made for module " << getId() << stack << endl;
+
+        Socket *socket = make_smoltcp_tcp_socket();
+        EV_TRACE << "made socket " << socket << endl;
+
+        auto b = add_smoltcp_tcp_socket(stack, socket);
+        EV_TRACE << "result:" << b << endl;
+
+        b = make_add_smoltcp_tcp_socket(stack);
+        EV_TRACE << "result:" << b << endl;
     }
 }
 
@@ -100,11 +114,10 @@ void SmolTcpStack::handleMessage(cMessage *msg)
 
         std::vector<unsigned char> b;
         b.resize(N - buf.getRemainingSize());
-        for (int i = 0; i < N - buf.getRemainingSize(); ++i)
+        for (size_t i = 0; i < N - buf.getRemainingSize(); ++i)
             b[i] =  bytes[i];
 
         rxBuffer.push_back(b);
-
 
         EV_TRACE << "added a buffer of " << N - buf.getRemainingSize() << " bytes to rxbuffer" << endl;
         poll_smoltcp_stack(stack, simTime().inUnit(SIMTIME_MS));
