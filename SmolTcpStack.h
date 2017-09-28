@@ -38,6 +38,10 @@ class SmolTcpStack : public cSimpleModule
     void sendEthernetFrame(unsigned const char *data, unsigned int size);
     unsigned int recvEthernetFrame(unsigned char *buffer);
 
+
+    void recvTcpData(uint16_t port, unsigned const char *data, unsigned int size);
+
+
   protected:
     int numInitStages() const { return inet::NUM_INIT_STAGES; }
     void initialize(int stage);

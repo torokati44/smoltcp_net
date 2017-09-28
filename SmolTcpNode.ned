@@ -16,6 +16,7 @@
 package smoltcp_net;
 
 
+import inet.applications.tcpapp.TCPEchoApp;
 import inet.linklayer.configurator.L2NodeConfigurator;
 import inet.linklayer.ethernet.EtherQoSQueue;
 import inet.linklayer.ethernet.EtherMAC;
@@ -29,12 +30,12 @@ module SmolTcpNode
 {
     @networkNode;
     @labels(node,ethernet-node);
-    @display("bgb=286.96,325.72");
+    @display("bgb=503.63336,377");
     gates:
         inout ethg[] @labels(EtherFrame-conn);
     submodules:
         stack: SmolTcpStack {
-            @display("p=237.32,98.6");
+            @display("p=262.93335,166.26668");
         }
         interfaceTable: InterfaceTable {
             @display("p=61,40");
@@ -48,12 +49,17 @@ module SmolTcpNode
             interfaceTableModule = "^.interfaceTable";
         }
         eth: EthernetInterface {
-            @display("p=202.64,214.88");
+            @display("p=262.93335,256.1667");
             interfaceTableModule = "^.interfaceTable";
             encapType = "EtherEncapDummy";
+        }
+        tcpEchoApp: TCPEchoApp {
+            @display("p=262.93335,45.433334");
         }
     connections:
         eth.phys <--> { @display("m=s"); } <--> ethg++;
         eth.upperLayerOut --> stack.ethIn;
         stack.ethOut --> eth.upperLayerIn;
+        tcpEchoApp.socketOut --> stack.appIn++;
+        stack.appOut++ --> tcpEchoApp.socketIn;
 }

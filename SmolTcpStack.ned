@@ -23,4 +23,6 @@ simple SmolTcpStack
     gates:
         input ethIn;
         output ethOut;
+        input appIn[];
+        output appOut[];
 }

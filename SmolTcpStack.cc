@@ -6,25 +6,29 @@
 #include "inet/common/packet/Packet.h"
 #include "inet/common/Units.h"
 
+
 #include "inet/common/serializer/EthernetCRC.h"
 #include "inet/linklayer/ethernet/EtherFrame_m.h"
 #include "inet/linklayer/ethernet/Ethernet.h"
+#include "inet/applications/common/SocketTag_m.h"
+#include "inet/transportlayer/contract/tcp/TCPCommand_m.h"
 
 extern "C" {
     void init_smoltcp_logging();
 
-    Stack *make_smoltcp_stack(unsigned long moduleID, const char *macAddress, const char *ipAddress);
+    Stack *make_smoltcp_stack(int moduleID, const char *macAddress, const char *ipAddress);
     void poll_smoltcp_stack(Stack *stack, unsigned long timestamp_ms);
 
-    void smoltcp_send_eth_frame(unsigned long moduleId, const unsigned char *data, unsigned int size) {
+    void smoltcp_send_eth_frame(int moduleId, const unsigned char *data, unsigned int size) {
         auto smolStack = check_and_cast<SmolTcpStack *>(getSimulation()->getModule(moduleId));
         smolStack->sendEthernetFrame(data, size);
     }
 
-    unsigned int smoltcp_recv_eth_frame(unsigned long moduleId, unsigned char *buffer) {
+    unsigned int smoltcp_recv_eth_frame(int moduleId, unsigned char *buffer) {
         auto smolStack = check_and_cast<SmolTcpStack *>(getSimulation()->getModule(moduleId));
         return smolStack->recvEthernetFrame(buffer);
     }
+
 
     // "level" corresponds to Rust's Log::LogLevel enum
     void smoltcp_log_line(uint8_t level, const char *text) {
@@ -35,13 +39,27 @@ extern "C" {
         EV_LOG(levelMapping[level], "smoltcp_c") << text << std::endl;
     }
 
+
+    void smoltcp_send_tcp_data(Stack *stack, uint16_t port, const unsigned char *data, uint32_t size); // definition in Rust, called from here
+
+    // this is calling BACK TO C++ - from Rust
+    void smoltcp_recv_tcp_data(int moduleId, uint16_t port, const unsigned char *data, uint32_t size) {
+        EV_INFO << "RECEIVED " << size << " BYTES ON PORT " << (int)port << "\n";
+        auto smolStack = check_and_cast<SmolTcpStack *>(getSimulation()->getModule(moduleId));
+        if (size > 0)
+            smolStack->recvTcpData(port, data, size);
+    }
+
+
     Socket *make_smoltcp_tcp_socket();
     uint64_t add_smoltcp_tcp_socket(Stack *stack, Socket *socket);
 
     uint64_t make_add_smoltcp_tcp_socket(Stack *stack);
 }
 
+
 Define_Module(SmolTcpStack);
+
 
 
 void SmolTcpStack::sendEthernetFrame(unsigned const char *data, unsigned int size) {
@@ -54,12 +72,12 @@ void SmolTcpStack::sendEthernetFrame(unsigned const char *data, unsigned int siz
     for(int i = 0; i < size; ++i)
         bytes[i] = data[i];
 
-    for (; size < MIN_ETHERNET_FRAME_BYTES-4; ++size)
+    for (; size < MIN_ETHERNET_FRAME_BYTES; ++size)
         bytes[size] = 0;
 
     auto chunk = std::make_shared<inet::BytesChunk>(bytes, size); // bytes, N ??
     chunk->markImmutable();
-    auto pkt = new inet::Packet("aa", chunk);
+    auto pkt = new inet::Packet("smoltcpEthFrame", chunk);
 
     auto ethFcs = std::make_shared<inet::EthernetFcs>();
     ethFcs->setFcsMode(inet::FCS_COMPUTED);
@@ -114,37 +132,56 @@ void SmolTcpStack::initialize(int stage)
 
         auto b = add_smoltcp_tcp_socket(stack, socket);
         EV_TRACE << "result:" << b << endl;
-
+/*
         b = make_add_smoltcp_tcp_socket(stack);
-        EV_TRACE << "result:" << b << endl;
+        EV_TRACE << "result:" << b << endl;*/
     }
 }
+
+
+void SmolTcpStack::recvTcpData(uint16_t port, unsigned const char *data, unsigned int size) {
+    EV_TRACE << "smoltcp received " << size << " bytes in module " << getId() << ", tcp port " << (int)port << endl;
+
+    auto chunk = std::make_shared<inet::BytesChunk>(data, size);
+    chunk->markImmutable();
+    auto pkt = new inet::Packet("tcpData", chunk);
+
+    pkt->setKind(inet::TCP_I_DATA);
+    pkt->ensureTag<inet::SocketInd>()->setSocketId(1);
+
+    send(pkt, "appOut", 0);
+}
+
 
 void SmolTcpStack::handleMessage(cMessage *msg)
 {
     if (auto packet = dynamic_cast<inet::Packet*>(msg)) {
-        EV_TRACE << "received a packet" << endl;
+        if (msg->arrivedOn("ethIn")) {
+            EV_TRACE << "received an ethernet frame" << endl;
 
-        int N = 2048;
-        unsigned char bytes[N];
+            auto chunk = packet->peekDataBytes();
+            auto b = chunk->getBytes();
 
-        //packet->popHeader(B(PREAMBLE_BYTES + SFD_BYTES));
-        auto chunk = packet->peekDataBytes();/* AllBytes();*/
-        auto b = chunk->getBytes();
-/*
-        // add FCS
-        const auto& fcsChunk = std::make_shared<inet::EthernetFcs>();
-        uint32_t fcs = inet::serializer::ethernetCRC(b.data(), b.size());
-        fcsChunk->setFcs(fcs);
-        fcsChunk->setFcsMode(inet::FCS_COMPUTED);
-        packet->insertTrailer(fcsChunk);*/
+            chunk = packet->peekDataBytes();
+            b = chunk->getBytes();
 
-        chunk = packet->peekDataBytes();
-        b = chunk->getBytes();
+            rxBuffer.push_back(b);
 
-        rxBuffer.push_back(b);
+            EV_TRACE << "added a buffer of " << b.size() << " bytes to rxbuffer" << endl;
+        }
+        else if (msg->arrivedOn("appIn")) {
+            EV_TRACE << "received some application data" << endl;
 
-        //EV_TRACE << "added a buffer of " << N - buf.getRemainingSize() << " bytes to rxbuffer" << endl;
+            auto chunk = packet->peekDataBytes();
+            auto b = chunk->getBytes();
+
+            chunk = packet->peekDataBytes();
+            b = chunk->getBytes();
+
+
+            smoltcp_send_tcp_data(stack, 6970, b.data(), b.size());
+        }
+
 
         EV_TRACE << "start poll" << endl;
         poll_smoltcp_stack(stack, simTime().inUnit(SIMTIME_MS));
